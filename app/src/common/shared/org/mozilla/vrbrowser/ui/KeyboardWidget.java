@@ -94,13 +94,17 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
 
     public void setFocusedView(View aFocusedView) {
         mFocusedView = aFocusedView;
-        mFocusedView.getHandler();
-        if (aFocusedView != null) {
+        if (mFocusedView != null) {
+            mFocusedView.getHandler();
             mInputConnection = aFocusedView.onCreateInputConnection(mEditorInfo);
             ((CustomKeyboard)mKeyboardview.getKeyboard()).setImeOptions(mEditorInfo.imeOptions);
         } else {
             mInputConnection = null;
         }
+    }
+
+    public View getFocusedView() {
+        return mFocusedView;
     }
 
     public void dismiss() {

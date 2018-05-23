@@ -39,7 +39,6 @@ public class BrowserActivity extends Activity implements SessionStore.SessionCha
     private BrowserHeaderWidget mBrowserHeader;
     private AudioEngine mAudioEngine;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.e(LOGTAG, "BrowserActivity onCreate");

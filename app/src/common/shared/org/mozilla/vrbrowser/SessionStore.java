@@ -63,6 +63,7 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
     private GeckoRuntime mRuntime;
     private GeckoSession mCurrentSession;
     private HashMap<Integer, State> mSessions;
+    private SessionTextInput.Delegate mSessionTextInputDelegate;
 
     private SessionStore() {
         mNavigationListeners = new LinkedList<>();
@@ -76,6 +77,7 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
     public void setContext(Context aContext) {
         if (mRuntime == null) {
             mRuntime = GeckoRuntime.create(aContext);
+            mRuntime.getSettings().setRemoteDebuggingEnabled(true);
         } else {
             mRuntime.attachTo(aContext);
         }
@@ -277,6 +279,9 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
             Log.e(LOGTAG, "SessionStore failed to set current session, GeckoRuntime is null");
             return;
         }
+        if (mCurrentSession != null) {
+            mCurrentSession.getTextInput().setDelegate(sDelegateStub);
+        }
         mCurrentSession = null;
         State state = mSessions.get(aId);
         if (state != null) {
@@ -287,6 +292,7 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
             for (SessionChangeListener listener: mSessionChangeListeners) {
                 listener.onCurrentSessionChange(mCurrentSession, aId);
             }
+            state.mSession.getTextInput().setDelegate(mSessionTextInputDelegate);
         }
         dumpAllState(mCurrentSession);
     }
@@ -362,6 +368,13 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
         return mCurrentSession.hashCode();
     }
 
+    public void setSessionTextInputDelegate(final SessionTextInput.Delegate aSessionTextInputDelegate) {
+        mSessionTextInputDelegate = aSessionTextInputDelegate;
+        if (mCurrentSession != null) {
+            mCurrentSession.getTextInput().setDelegate(mSessionTextInputDelegate);
+        }
+    }
+
     @Override
     public void onLocationChange(GeckoSession aSession, String aUri) {
         Log.e(LOGTAG, "SessionStore onLocationChange: " + aUri);
@@ -411,10 +424,14 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
     public void onNewSession(GeckoSession aSession, String aUri, GeckoResponse<GeckoSession> aResponse) {
         Log.e(LOGTAG,"Got onNewSession: " + aUri);
         int sessionId = createSession();
+        if (mCurrentSession != null) {
+            mCurrentSession.getTextInput().setDelegate(sDelegateStub);
+        }
         mCurrentSession = null;
         State state = mSessions.get(sessionId);
         if (state != null) {
             mCurrentSession = state.mSession;
+            mCurrentSession.getTextInput().setDelegate(mSessionTextInputDelegate);
             for (SessionChangeListener listener: mSessionChangeListeners) {
                 listener.onCurrentSessionChange(mCurrentSession, sessionId);
             }

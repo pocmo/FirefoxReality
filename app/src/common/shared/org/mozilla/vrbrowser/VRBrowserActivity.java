@@ -19,11 +19,17 @@ import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.inputmethod.CursorAnchorInfo;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+
+import org.mozilla.geckoview.SessionTextInput;
 
 import org.mozilla.vrbrowser.audio.AudioEngine;
 import org.mozilla.vrbrowser.audio.VRAudioTheme;
@@ -72,6 +78,8 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     BrowserWidget mBrowserWidget;
     KeyboardWidget mKeyboard;
     private boolean mWasBrowserPressed = false;
+    private SessionTextInput.Delegate mSessionTextInputDelegate;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,6 +125,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
                 mAudioEngine.update();
             }
         };
+        mSessionTextInputDelegate = new InputDelegate();
 
         loadFromIntent(getIntent());
         queueRunnable(new Runnable() {
@@ -127,14 +136,46 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         });
     }
 
+    private class InputDelegate implements SessionTextInput.Delegate {
+        public void restartInput(int reason){
+            Log.e(LOGTAG, "RESTART SOFT INPUT");
+        }
+        public void showSoftInput() {
+            Log.e(LOGTAG, "SHOW SOFT INPUT");
+            if (mBrowserWidget == null) {
+                return;
+            }
+            showKeyboard(mBrowserWidget);
+
+        }
+        public void hideSoftInput() {
+            Log.e(LOGTAG, "HIDE SOFT INPUT");
+            if (mKeyboard != null && mKeyboard.getFocusedView() == mBrowserWidget) {
+                updateWidget(mKeyboard.getHandle(), false, null);
+            }
+        }
+        public void updateSelection(int selStart, int selEnd, int compositionStart, int compositionEnd) {
+
+        }
+        public void updateExtractedText(ExtractedTextRequest request, ExtractedText text) {
+
+        }
+        public void updateCursorAnchorInfo(CursorAnchorInfo info) {
+
+        }
+    }
+
+
     @Override
     protected void onPause() {
+        SessionStore.get().setSessionTextInputDelegate(null);
         mAudioEngine.pauseEngine();
         super.onPause();
     }
 
     @Override
     protected void onResume() {
+        SessionStore.get().setSessionTextInputDelegate(mSessionTextInputDelegate);
         mAudioEngine.resumeEngine();
         super.onResume();
     }
@@ -265,27 +306,39 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
 
     }
 
+    void showKeyboard(View focusedView) {
+        if ((focusedView == null) || (mKeyboard == null)) {
+            return;
+        }
+        mKeyboard.setFocusedView(focusedView);
+        WidgetPlacement updatedPlacement = null;
+        // Fixme: Improve keyboard placement once GeckoView API lands a way to detect the TextView position on a webpage
+        // For now we just use different placements for navigation bar &  GeckoView
+        float translationY = focusedView.equals(mBrowserWidget) ? -30.0f : -20.0f;
+        if (translationY != mKeyboard.getPlacement().translationY) {
+            updatedPlacement = mKeyboard.getPlacement();
+            updatedPlacement.translationY = translationY;
+        }
+
+        boolean keyboardIsVisible = mKeyboard.getVisibility() == View.VISIBLE;
+        if (!keyboardIsVisible || (updatedPlacement != null)) {
+            updateWidget(mKeyboard.getHandle(), true, updatedPlacement);
+        }
+    }
+
     void checkKeyboardFocus(View focusedView) {
         if (mKeyboard == null) {
             return;
         }
 
-        boolean showKeyboard = focusedView.onCheckIsTextEditor();
-        WidgetPlacement updatedPlacement = null;
-        if (showKeyboard) {
-            mKeyboard.setFocusedView(focusedView);
-            // Fixme: Improve keyboard placement once GeckoView API lands a way to detect the TextView position on a webpage
-            // For now we just use different placements for navigation bar &  GeckoView
-            float translationY = focusedView == mBrowserWidget ? -30.0f : -20.0f;
-            if (translationY != mKeyboard.getPlacement().translationY) {
-                updatedPlacement = mKeyboard.getPlacement();
-                updatedPlacement.translationY = translationY;
-            }
-
+        if ((focusedView == null) || (mBrowserWidget == null) || focusedView.equals(mBrowserWidget)) {
+            return;
         }
-        boolean keyboardIsVisible = mKeyboard.getVisibility() == View.VISIBLE;
-        if (showKeyboard != keyboardIsVisible || (updatedPlacement != null)) {
-            updateWidget(mKeyboard.getHandle(), showKeyboard, updatedPlacement);
+
+        if (focusedView.onCheckIsTextEditor()) {
+            showKeyboard(focusedView);
+        } else if (mKeyboard.getVisibility() == View.VISIBLE) {
+            updateWidget(mKeyboard.getHandle(), false, null);
         }
     }
 
@@ -304,19 +357,10 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
             @Override
             public void run() {
                 Widget widget = mWidgets.get(aHandle);
-                MotionEventGenerator.dispatch(widget, aDevice, aPressed, aX, aY);
-
-                // Fixme: Remove this once the new Keyboard delegate lands in GeckoView
-                if (widget == mBrowserWidget) {
-                    if (mWasBrowserPressed != aPressed) {
-                        mHandler.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                checkKeyboardFocus(mBrowserWidget);
-                            }
-                        }, 150);
-                    }
-                    mWasBrowserPressed = aPressed;
+                if (widget != null) {
+                    MotionEventGenerator.dispatch(widget, aDevice, aPressed, aX, aY);
+                } else {
+                    Log.e(LOGTAG, "Failed to find widget: " + aHandle);
                 }
             }
         });
