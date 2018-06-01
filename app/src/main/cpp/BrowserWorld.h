@@ -44,6 +44,8 @@ protected:
   struct State;
   BrowserWorld(State& aState);
   ~BrowserWorld();
+  void DrawWorld();
+  void DrawImmersive();
   void CreateFloor();
   void CreateControllerPointer();
 private:

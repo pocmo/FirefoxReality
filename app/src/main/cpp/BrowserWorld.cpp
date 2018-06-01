@@ -5,6 +5,9 @@
 
 #include "BrowserWorld.h"
 #include "ControllerDelegate.h"
+#include "DeviceDelegate.h"
+#include "ExternalVR.h"
+#include "GeckoSurfaceTexture.h"
 #include "Widget.h"
 #include "WidgetPlacement.h"
 #include "vrb/CameraSimple.h"
@@ -54,6 +57,8 @@ static const char* kHandleAudioPoseSignature = "(FFFFFFF)V";
 static const char* kHandleGestureName = "handleGesture";
 static const char* kHandleGestureSignature = "(I)V";
 static const char* kTileTexture = "tile.png";
+static const char* kRegisterExternalContextName = "registerExternalContext";
+static const char* kRegisterExternalContextSignature = "(J)V";
 class SurfaceObserver;
 typedef std::shared_ptr<SurfaceObserver> SurfaceObserverPtr;
 
@@ -365,14 +370,16 @@ struct BrowserWorld::State {
   jmethodID handleScrollEventMethod;
   jmethodID handleAudioPoseMethod;
   jmethodID handleGestureMethod;
+  jmethodID registerExternalContextMethod;
   GestureDelegateConstPtr gestures;
+  ExternalVRPtr externalVR;
   bool windowsInitialized;
 
   State() : paused(true), glInitialized(false), env(nullptr), nearClip(0.1f),
             farClip(100.0f), activity(nullptr),
             dispatchCreateWidgetMethod(nullptr), handleMotionEventMethod(nullptr),
             handleScrollEventMethod(nullptr), handleAudioPoseMethod(nullptr),
-            handleGestureMethod(nullptr),
+            handleGestureMethod(nullptr), registerExternalContextMethod(nullptr),
             windowsInitialized(false) {
     context = Context::Create();
     contextWeak = context;
@@ -390,6 +397,7 @@ struct BrowserWorld::State {
     controllers = ControllerContainer::Create();
     controllers->context = contextWeak;
     controllers->root = Toggle::Create(contextWeak);
+    externalVR = ExternalVR::Create();
   }
 
   void UpdateControllers();
@@ -531,13 +539,14 @@ BrowserWorld::RegisterDeviceDelegate(DeviceDelegatePtr aDelegate) {
   DeviceDelegatePtr previousDevice = std::move(m.device);
   m.device = aDelegate;
   if (m.device) {
+    m.device->RegisterImmersiveDisplay(m.externalVR);
 #if defined(SNAPDRAGONVR)
     m.device->SetClearColor(vrb::Color(0.0f, 0.0f, 0.0f));
 #else
     m.device->SetClearColor(vrb::Color(0.15f, 0.15f, 0.15f));
 #endif
-    m.leftCamera = m.device->GetCamera(DeviceDelegate::CameraEnum::Left);
-    m.rightCamera = m.device->GetCamera(DeviceDelegate::CameraEnum::Right);
+    m.leftCamera = m.device->GetCamera(device::Eye::Left);
+    m.rightCamera = m.device->GetCamera(device::Eye::Right);
     ControllerDelegatePtr delegate = m.controllers;
     m.device->SetClipPlanes(m.nearClip, m.farClip);
     m.device->SetControllerDelegate(delegate);
@@ -620,6 +629,19 @@ BrowserWorld::InitializeJava(JNIEnv* aEnv, jobject& aActivity, jobject& aAssetMa
     VRB_LOG("Failed to find Java method: %s %s", kHandleGestureName, kHandleGestureSignature);
   }
 
+  m.registerExternalContextMethod = m.env->GetMethodID(clazz, kRegisterExternalContextName,
+                                                       kRegisterExternalContextSignature);
+
+  if (!m.registerExternalContextMethod) {
+    VRB_LOG("Failed to find Java method: %s %s", kRegisterExternalContextName,
+            kRegisterExternalContextSignature);
+  } else {
+    m.env->CallVoidMethod(m.activity, m.registerExternalContextMethod,
+                          (jlong)m.externalVR->GetSharedData());
+  }
+
+  GeckoSurfaceTexture::InitializeJava(m.env, m.activity);
+
   if (!m.controllers->modelsLoaded) {
     const int32_t modelCount = m.device->GetControllerModelCount();
     for (int32_t index = 0; index < modelCount; index++) {
@@ -663,6 +685,7 @@ BrowserWorld::InitializeGL() {
 void
 BrowserWorld::ShutdownJava() {
   VRB_LOG("BrowserWorld::ShutdownJava");
+  GeckoSurfaceTexture::ShutdownJava();
   if (m.env) {
     m.env->DeleteGlobalRef(m.activity);
   }
@@ -672,6 +695,7 @@ BrowserWorld::ShutdownJava() {
   m.handleScrollEventMethod = nullptr;
   m.handleAudioPoseMethod = nullptr;
   m.handleGestureMethod = nullptr;
+  m.registerExternalContextMethod = nullptr;
   m.env = nullptr;
 }
 
@@ -704,26 +728,13 @@ BrowserWorld::Draw() {
   m.device->ProcessEvents();
   m.context->Update();
   m.UpdateControllers();
-  m.drawListOpaque->Reset();
-  m.drawListTransparent->Reset();
-  m.rootOpaque->Cull(*m.cullVisitor, *m.drawListOpaque);
-  m.rootTransparent->Cull(*m.cullVisitor, *m.drawListTransparent);
-  m.device->StartFrame();
-  m.device->BindEye(DeviceDelegate::CameraEnum::Left);
-  m.drawListOpaque->Draw(*m.leftCamera);
-  VRB_GL_CHECK(glDepthMask(GL_FALSE));
-  m.drawListTransparent->Draw(*m.leftCamera);
-  VRB_GL_CHECK(glDepthMask(GL_TRUE));
-  // When running the noapi flavor, we only want to render one eye.
-#if !defined(VRBROWSER_NO_VR_API)
-  m.device->BindEye(DeviceDelegate::CameraEnum::Right);
-  m.drawListOpaque->Draw(*m.rightCamera);
-  VRB_GL_CHECK(glDepthMask(GL_FALSE));
-  m.drawListTransparent->Draw(*m.rightCamera);
-  VRB_GL_CHECK(glDepthMask(GL_TRUE));
-#endif // !defined(VRBROWSER_NO_VR_API)
-  m.device->EndFrame();
-
+  m.externalVR->PullBrowserState();
+  if (m.externalVR->IsPresenting()) {
+    DrawImmersive();
+  } else {
+    DrawWorld();
+  }
+  m.externalVR->PushSystemState();
   // Update the 3d audio engine with the most recent head rotation.
   if (m.handleAudioPoseMethod) {
     const vrb::Matrix &head = m.device->GetHeadTransform();
@@ -793,8 +804,8 @@ BrowserWorld::UpdateWidget(int32_t aHandle, const WidgetPlacement& aPlacement) {
 
   WidgetPtr parent = m.GetWidget(aPlacement.parentHandle);
 
-  int32_t parentWidth, parentHeight;
-  float parentWorldWith, parentWorldHeight;
+  int32_t parentWidth = 0, parentHeight = 0;
+  float parentWorldWith = 0.0f, parentWorldHeight = 0.0f;
 
   if (parent) {
     parent->GetSurfaceTextureSize(parentWidth, parentHeight);
@@ -850,9 +861,39 @@ BrowserWorld::BrowserWorld(State& aState) : m(aState) {
 }
 
 BrowserWorld::~BrowserWorld() {
- if (sWorld == this) {
-  sWorld = nullptr;
- }
+  if (sWorld == this) {
+    sWorld = nullptr;
+  }
+}
+
+void
+BrowserWorld::DrawWorld() {
+  m.device->SetRenderMode(device::RenderMode::StandAlone);
+  m.drawListOpaque->Reset();
+  m.drawListTransparent->Reset();
+  m.rootOpaque->Cull(*m.cullVisitor, *m.drawListOpaque);
+  m.rootTransparent->Cull(*m.cullVisitor, *m.drawListTransparent);
+  m.device->StartFrame();
+  m.device->BindEye(device::Eye::Left);
+  m.drawListOpaque->Draw(*m.leftCamera);
+  VRB_GL_CHECK(glDepthMask(GL_FALSE));
+  m.drawListTransparent->Draw(*m.leftCamera);
+  VRB_GL_CHECK(glDepthMask(GL_TRUE));
+  // When running the noapi flavor, we only want to render one eye.
+#if !defined(VRBROWSER_NO_VR_API)
+  m.device->BindEye(device::Eye::Right);
+  m.drawListOpaque->Draw(*m.rightCamera);
+  VRB_GL_CHECK(glDepthMask(GL_FALSE));
+  m.drawListTransparent->Draw(*m.rightCamera);
+  VRB_GL_CHECK(glDepthMask(GL_TRUE));
+#endif // !defined(VRBROWSER_NO_VR_API)
+  m.device->EndFrame();
+}
+
+void
+BrowserWorld::DrawImmersive() {
+  m.device->SetRenderMode(device::RenderMode::Immersive);
+  m.externalVR->SetHeadTransform(m.device->GetHeadTransform());
 }
 
 void

@@ -7,6 +7,7 @@ package org.mozilla.vrbrowser;
 
 import android.content.Context;
 
+import org.mozilla.gecko.PrefsHelper;
 import org.mozilla.geckoview.GeckoResponse;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
@@ -37,7 +38,7 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
         }
         return mInstance;
     }
-    public static final String DEFAULT_URL = "resource://android/assets/html/index.html";
+    public static final String DEFAULT_URL = "https://webvr.info/samples/03-vr-presentation.html"; // resource://android/assets/html/index.html";
 
     private LinkedList<GeckoSession.NavigationDelegate> mNavigationListeners;
     private LinkedList<GeckoSession.ProgressDelegate> mProgressListeners;
@@ -87,6 +88,8 @@ public class SessionStore implements GeckoSession.NavigationDelegate, GeckoSessi
                     GeckoSession.TrackingProtectionDelegate.CATEGORY_ANALYTIC |
                     GeckoSession.TrackingProtectionDelegate.CATEGORY_SOCIAL |
                     GeckoSession.TrackingProtectionDelegate.CATEGORY_CONTENT);
+            PrefsHelper.setPref("dom.vr.enabled", true);
+            PrefsHelper.setPref("dom.vr.external.enabled", true);
         } else {
             mRuntime.attachTo(aContext);
         }

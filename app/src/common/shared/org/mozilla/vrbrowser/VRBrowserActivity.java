@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 
+import org.mozilla.gecko.GeckoVRManager;
 import org.mozilla.vrbrowser.audio.AudioEngine;
 import org.mozilla.vrbrowser.audio.VRAudioTheme;
 import org.mozilla.vrbrowser.ui.BrowserHeaderWidget;
@@ -314,6 +315,11 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         // https://developers.google.com/vr/reference/android/com/google/vr/sdk/audio/GvrAudioEngine.html#resume()
         // The update method must be called from the main thread at a regular rate.
         runOnUiThread(mAudioUpdateRunnable);
+    }
+
+    @Keep
+    void registerExternalContext(long aContext) {
+        GeckoVRManager.setExternalContext(aContext);
     }
 
     void createOffscreenDisplay() {
