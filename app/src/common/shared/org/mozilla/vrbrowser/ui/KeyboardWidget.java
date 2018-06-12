@@ -5,22 +5,19 @@
 
 package org.mozilla.vrbrowser.ui;
 
-import android.app.Activity;
 import android.content.Context;
+import android.graphics.PointF;
 import android.graphics.drawable.Drawable;
 import android.inputmethodservice.Keyboard;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.TextView;
+import android.widget.RelativeLayout;
 
 import org.mozilla.vrbrowser.R;
 import org.mozilla.vrbrowser.WidgetPlacement;
@@ -37,6 +34,8 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
     private View mFocusedView;
     private InputConnection mInputConnection;
     private EditorInfo mEditorInfo = new EditorInfo();
+    private boolean mIsPopupVisible = false;
+    private RelativeLayout.LayoutParams mOriginalLayoutParams;
 
     public KeyboardWidget(Context aContext) {
         super(aContext);
@@ -83,15 +82,22 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
         closeKeyboardButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                dismiss();
+                if (mIsPopupVisible) {
+                    mKeyboardview.setKeyboard(mKeyboardQuerty);
+                    mKeyboardview.setLayoutParams(mOriginalLayoutParams);
+                    mIsPopupVisible = false;
+
+                } else {
+                    dismiss();
+                }
             }
         });
     }
 
     @Override
     void initializeWidgetPlacement(WidgetPlacement aPlacement) {
-        aPlacement.width = 640;
-        aPlacement.height = 192;
+        aPlacement.width = 648;
+        aPlacement.height = 210;
         aPlacement.parentAnchorX = 0.5f;
         aPlacement.parentAnchorY = 0.5f;
         aPlacement.anchorX = 0.5f;
@@ -130,6 +136,44 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
     }
 
     @Override
+    public void onLongPress(Keyboard.Key popupKey) {
+        if (popupKey.popupCharacters != null) {
+            CustomKeyboard popupKeyboard = new CustomKeyboard(getContext(), popupKey.popupResId,
+                    popupKey.popupCharacters, 8, 0);
+            mKeyboardview.setKeyboard(popupKeyboard);
+
+            mOriginalLayoutParams = (RelativeLayout.LayoutParams) mKeyboardview.getLayoutParams();
+            RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.WRAP_CONTENT,
+                    RelativeLayout.LayoutParams.WRAP_CONTENT);
+            switch (popupKey.codes[0]) {
+                case 98:
+                case 104:
+                case 105:
+                case 106:
+                case 107:
+                case 108:
+                case 109:
+                case 110:
+                case 111:
+                case 112:
+                case 117:
+                case 187:{
+                    params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+                    params.rightMargin = mKeyboardview.getWidth() - popupKey.x - popupKey.width/2 + mKeyboardview.getPaddingRight();
+                }
+                break;
+                default:{
+                    params.leftMargin = popupKey.x;
+                }
+            }
+            params.topMargin= popupKey.y;
+            mKeyboardview.setLayoutParams(params);
+            mIsPopupVisible = true;
+        }
+    }
+
+    @Override
     public void onRelease(int primaryCode) {
 
     }
@@ -161,6 +205,9 @@ public class KeyboardWidget extends UIWidget implements CustomKeyboardView.OnKey
                 break;
             default:
                 handleKey(primaryCode, keyCodes);
+                mKeyboardview.setKeyboard(mKeyboardQuerty);
+                mKeyboardview.setLayoutParams(mOriginalLayoutParams);
+                mIsPopupVisible = false;
                 break;
         }
     }
