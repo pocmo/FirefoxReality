@@ -10,4 +10,8 @@
     <string name="permission_camera_and_microphone">Will you allow %1$s to use your camera and microphone?</string>
     <string name="permission_location">Will you allow %1$s to access your location?</string>
     <string name="permission_notification">Will you allow %1$s to send notifications?</string>
+    <string name="settings_version">version %1$s</string>
+    <string name="settings_crash_reporting">Crash Reporting</string>
+    <string name="settings_telemetry">Telemetry</string>
+    <string name="settings_privacy">Privacy Policy</string>
 </resources>

@@ -4,6 +4,7 @@ package org.mozilla.vrbrowser.ui;
 import android.content.Context;
 import android.support.design.widget.TabLayout;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.TranslateAnimation;
@@ -24,7 +25,7 @@ import java.util.List;
 public class BrowserHeaderWidget extends UIWidget
         implements TabLayout.OnTabSelectedListener, CustomTabLayout.Delegate,
         SessionStore.SessionChangeListener, GeckoSession.ContentDelegate, GeckoSession.ProgressDelegate,
-        MoreMenuWidget.Delegate, TabOverflowWidget.Delegate {
+        MoreMenuWidget.Delegate, TabOverflowWidget.Delegate, SettingsWidget.Delegate {
     private Context mContext;
     private CustomTabLayout mTabContainer;
     private ImageButton mAddTabButton;
@@ -35,6 +36,7 @@ public class BrowserHeaderWidget extends UIWidget
     private int mHeaderButtonMargin;
     private int mTabLayoutAddMargin;
     private MoreMenuWidget mMoreMenu;
+    private SettingsWidget mSettingsMenu;
     private TabOverflowWidget mTabOverflowMenu;
     private boolean mIsPrivateBrowsing = false;
     private boolean mAnimateTabs = true;
@@ -117,7 +119,7 @@ public class BrowserHeaderWidget extends UIWidget
         mCloseWindowButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                showSettingsMenu();
             }
         });
 
@@ -175,6 +177,26 @@ public class BrowserHeaderWidget extends UIWidget
         if (mMoreMenu != null && mMoreMenu.getVisibility() == View.VISIBLE) {
             mMoreMenu.getPlacement().visible = false;
             mWidgetManager.updateWidget(mMoreMenu);
+        }
+    }
+
+    private void showSettingsMenu() {
+        if (mSettingsMenu == null) {
+            mSettingsMenu = new SettingsWidget(getContext());
+            mSettingsMenu.getPlacement().parentHandle = getHandle();
+            mSettingsMenu.setDelegate(BrowserHeaderWidget.this);
+            mWidgetManager.addWidget(mSettingsMenu);
+        }
+        else {
+            mSettingsMenu.getPlacement().visible = true;
+            mWidgetManager.updateWidget(mSettingsMenu);
+        }
+    }
+
+    private void hideSettingsMenu() {
+        if (mSettingsMenu != null && mSettingsMenu.getVisibility() == View.VISIBLE) {
+            mSettingsMenu.getPlacement().visible = false;
+            mWidgetManager.updateWidget(mSettingsMenu);
         }
     }
 
@@ -510,6 +532,26 @@ public class BrowserHeaderWidget extends UIWidget
     @Override
     public void onMenuCloseClick() {
         hideMoreMenu();
+    }
+
+    @Override
+    public void onSettingsCrashReportingChange(boolean isEnabled) {
+        Log.e(LOGTAG, "************** CRASH REPORT CHANGED!!: " + isEnabled);
+    }
+
+    @Override
+    public void onSettingsTelemetryChange(boolean isEnable) {
+        Log.e(LOGTAG, "************** TELEMETRY CHANGED!!: " + isEnable);
+    }
+
+    @Override
+    public void onSettingsPrivacyClick() {
+        Log.e(LOGTAG, "************** PRIVACY POLICY CLICKED");
+    }
+
+    @Override
+    public void onSettingsCloseClick() {
+        hideSettingsMenu();
     }
 
     // TabOverFlow Delegate
