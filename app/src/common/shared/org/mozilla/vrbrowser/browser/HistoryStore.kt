@@ -38,9 +38,11 @@ class HistoryStore constructor(val context: Context) {
     }
 
     init {
+        /*
         (context.applicationContext as VRBrowserApplication).services.accountManager.registerForSyncEvents(
                 syncStatusObserver, ProcessLifecycleOwner.get(), false
         )
+         */
     }
 
     interface HistoryListener {

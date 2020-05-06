@@ -61,8 +61,8 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
         // Make sure we get logs out of our android-components.
         Log.addSink(AndroidLogSink())
 
-        GlobalSyncableStoreProvider.configureStore(SyncEngine.Bookmarks to places.bookmarks)
-        GlobalSyncableStoreProvider.configureStore(SyncEngine.History to places.history)
+        // GlobalSyncableStoreProvider.configureStore(SyncEngine.Bookmarks to places.bookmarks)
+        // GlobalSyncableStoreProvider.configureStore(SyncEngine.History to places.history)
 
         // TODO this really shouldn't be necessary, since WorkManager auto-initializes itself, unless
         // auto-initialization is disabled in the manifest file. We don't disable the initialization,
@@ -81,6 +81,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
 
     // Process received device events, only handling received tabs for now.
     // They'll come from other FxA devices (e.g. Firefox Desktop).
+    /*
     private val deviceEventObserver = object : DeviceEventsObserver {
         private val logTag = "DeviceEventsObserver"
 
@@ -119,6 +120,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
             accountManager.initAsync().await()
         }
     }
+     */
 
     override fun onLoadRequest(geckoSession: GeckoSession, loadRequest: GeckoSession.NavigationDelegate.LoadRequest): GeckoResult<AllowOrDeny>? {
         if (loadRequest.uri.startsWith(REDIRECT_URL)) {
@@ -131,6 +133,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
                 val geckoResult = GeckoResult<AllowOrDeny>()
 
                 // Notify the state machine about our success.
+                /*
                 val result = accountManager.finishAuthenticationAsync(FxaAuthData(action.toAuthType(), code = code, state = state))
                 CoroutineScope(Dispatchers.Main).launch {
                     if (!result.await()) {
@@ -142,6 +145,7 @@ class Services(val context: Context, places: Places): GeckoSession.NavigationDel
                         geckoResult.complete(AllowOrDeny.ALLOW)
                     }
                 }
+                 */ geckoResult.complete(AllowOrDeny.ALLOW)
 
                 return geckoResult
             }

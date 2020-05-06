@@ -62,7 +62,7 @@ class BookmarksStore constructor(val context: Context) {
     private val listeners = ArrayList<BookmarkListener>()
     private var storage = (context.applicationContext as VRBrowserApplication).places.bookmarks
     private var titles = rootTitles(context)
-    private val accountManager = (context.applicationContext as VRBrowserApplication).services.accountManager
+    //private val accountManager = (context.applicationContext as VRBrowserApplication).services.accountManager
 
     // Bookmarks might have changed during sync, so notify our listeners.
     private val syncStatusObserver = object : SyncStatusObserver {
@@ -77,9 +77,11 @@ class BookmarksStore constructor(val context: Context) {
     }
 
     init {
+        /*
         accountManager.registerForSyncEvents(
             syncStatusObserver, ProcessLifecycleOwner.get(), false
         )
+         */
     }
 
     // Update the folder strings after a language update
