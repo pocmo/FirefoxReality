@@ -51,7 +51,11 @@ public class GleanMetricsService {
         } else {
             GleanMetricsService.stop();
         }
-        Configuration config = new Configuration(Configuration.DEFAULT_TELEMETRY_ENDPOINT, BuildConfig.BUILD_TYPE);
+        Configuration config = new Configuration(
+            GleanHttpClient.create(aContext),
+            Configuration.DEFAULT_TELEMETRY_ENDPOINT,
+            BuildConfig.BUILD_TYPE
+        );
         Glean.INSTANCE.initialize(aContext, true, config);
     }
 
