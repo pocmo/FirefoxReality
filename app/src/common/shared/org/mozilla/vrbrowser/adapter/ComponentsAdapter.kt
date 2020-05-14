@@ -8,6 +8,7 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.concept.engine.EngineSession
 import mozilla.components.concept.engine.EngineSessionState
 import mozilla.components.concept.engine.Settings
+import mozilla.components.support.base.log.logger.Logger
 import org.json.JSONObject
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.vrbrowser.browser.engine.Session
@@ -21,19 +22,27 @@ class ComponentsAdapter private constructor(
         fun get(): ComponentsAdapter = instance
     }
 
+    private val logger = Logger("ComponentsAdapter")
+
     fun addSession(session: Session) {
+        logger.debug("addSession(${session.id}, ${session.currentUri})")
+
         store.dispatch(TabListAction.AddTabAction(
             tab = session.toTabSessionState()
         ))
     }
 
     fun removeSession(session: Session) {
+        logger.debug("removeSession(${session.id}, ${session.currentUri})")
+
         store.dispatch(TabListAction.RemoveTabAction(
             tabId = session.id
         ))
     }
 
     fun link(tabId: String, geckoSession: GeckoSession) {
+        logger.debug("link(${tabId})")
+
         store.dispatch(EngineAction.LinkEngineSessionAction(
             tabId,
             GeckoEngineSession(geckoSession)
@@ -41,6 +50,8 @@ class ComponentsAdapter private constructor(
     }
 
     fun unlink(tabId: String) {
+        logger.debug("unlink(${tabId})")
+
         store.dispatch(EngineAction.UnlinkEngineSessionAction(
             tabId
         ))
