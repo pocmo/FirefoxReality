@@ -32,6 +32,7 @@ import org.mozilla.geckoview.MediaElement;
 import org.mozilla.geckoview.SlowScriptResponse;
 import org.mozilla.geckoview.WebRequestError;
 import org.mozilla.vrbrowser.R;
+import org.mozilla.vrbrowser.adapter.ComponentsAdapter;
 import org.mozilla.vrbrowser.browser.Media;
 import org.mozilla.vrbrowser.browser.SessionChangeListener;
 import org.mozilla.vrbrowser.browser.SettingsStore;
@@ -166,6 +167,7 @@ public class Session implements ContentBlocking.Delegate, GeckoSession.Navigatio
             }
             mState.mDisplay = null;
             mState.mSession = null;
+            ComponentsAdapter.Companion.get().unlink(getId());
         }
 
         for (SessionChangeListener listener : mSessionChangeListeners) {
@@ -434,6 +436,7 @@ public class Session implements ContentBlocking.Delegate, GeckoSession.Navigatio
         Log.d(LOGTAG, "Suspending Session: " + mState.mId);
         closeSession(mState);
         mState.mSession = null;
+        ComponentsAdapter.Companion.get().unlink(getId());
     }
 
     private boolean shouldLoadDefaultPage(@NonNull SessionState aState) {
@@ -465,6 +468,8 @@ public class Session implements ContentBlocking.Delegate, GeckoSession.Navigatio
         }
 
         mState.mSession = createGeckoSession(settings);
+        ComponentsAdapter.Companion.get().link(getId(), mState.mSession);
+
         if (!mState.mSession.isOpen()) {
             mState.mSession.open(mRuntime);
         }
@@ -497,6 +502,7 @@ public class Session implements ContentBlocking.Delegate, GeckoSession.Navigatio
         SessionState state = new SessionState();
         state.mSettings = aSettings;
         state.mSession = createGeckoSession(aSettings);
+        ComponentsAdapter.Companion.get().link(getId(), state.mSession);
 
         if (aOpenMode == SESSION_OPEN && !state.mSession.isOpen()) {
             state.mSession.open(mRuntime);

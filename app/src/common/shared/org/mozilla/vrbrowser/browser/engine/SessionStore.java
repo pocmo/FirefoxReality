@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.vrbrowser.VRBrowserApplication;
+import org.mozilla.vrbrowser.adapter.ComponentsAdapter;
 import org.mozilla.vrbrowser.browser.BookmarksStore;
 import org.mozilla.vrbrowser.browser.HistoryStore;
 import org.mozilla.vrbrowser.browser.PermissionDelegate;
@@ -106,6 +107,9 @@ public class SessionStore implements GeckoSession.PermissionDelegate{
         aSession.addNavigationListener(mServices);
         mSessions.add(aSession);
         sessionActiveStateChanged();
+
+        ComponentsAdapter.Companion.get().addSession(aSession);
+
         return aSession;
     }
 
@@ -144,6 +148,7 @@ public class SessionStore implements GeckoSession.PermissionDelegate{
         mSessions.remove(aSession);
         if (aSession != null) {
             shutdownSession(aSession);
+            ComponentsAdapter.Companion.get().removeSession(aSession);
         }
     }
 
@@ -153,6 +158,7 @@ public class SessionStore implements GeckoSession.PermissionDelegate{
                 return false;
             }
             shutdownSession(session);
+            ComponentsAdapter.Companion.get().removeSession(session);
             return true;
         });
     }
